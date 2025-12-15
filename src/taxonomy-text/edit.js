@@ -1,15 +1,21 @@
 import { __ } from '@wordpress/i18n';
+import { InspectorControls, useBlockProps } from '@wordpress/block-editor';
 import {
-	InspectorControls,
-	useBlockProps,
-} from '@wordpress/block-editor';
-import { PanelBody, SelectControl, TextControl } from '@wordpress/components';
+	PanelBody,
+	SelectControl,
+	TextControl,
+	ToggleControl,
+} from '@wordpress/components';
 
 const FILTER_OPTIONS = [
 	{ label: __( 'Tag', 'query-filter' ), value: 'tag' },
 	{ label: __( 'Category', 'query-filter' ), value: 'category' },
 	{ label: __( 'Sort', 'query-filter' ), value: 'sort' },
 	{ label: __( 'Page Number', 'query-filter' ), value: 'page' },
+	{
+		label: __( 'Yoast Primary Category', 'query-filter' ),
+		value: 'yoast_primary_category',
+	},
 ];
 
 const VALUE_TYPE_OPTIONS = [
@@ -24,6 +30,7 @@ export default function Edit( { attributes, setAttributes } ) {
 		valueType = 'title',
 		prefix = '',
 		suffix = '',
+		link = false,
 		showAfterFirstPage = true,
 	} = attributes;
 
@@ -42,12 +49,20 @@ export default function Edit( { attributes, setAttributes } ) {
 		setAttributes( {
 			filterType: nextFilter,
 			valueType:
-				[ 'sort', 'page' ].includes( nextFilter ) &&
-				valueType === 'description'
+				nextFilter === 'page'
+					? 'page'
+					: nextFilter === 'sort' && valueType === 'description'
 					? 'title'
 					: valueType,
 		} );
 	};
+
+	const valueTypeOptions =
+		filterType === 'page'
+			? VALUE_TYPE_OPTIONS.filter( ( option ) => option.value === 'page' )
+			: filterType === 'sort'
+			? VALUE_TYPE_OPTIONS.filter( ( option ) => option.value === 'title' )
+			: VALUE_TYPE_OPTIONS;
 
 	return (
 		<>
@@ -59,14 +74,25 @@ export default function Edit( { attributes, setAttributes } ) {
 						options={ FILTER_OPTIONS }
 						onChange={ handleFilterChange }
 					/>
+					{ [ 'tag', 'category', 'yoast_primary_category' ].includes(
+						filterType
+					) && (
+						<ToggleControl
+							label={ __(
+								'Link to term archive',
+								'query-filter'
+							) }
+							checked={ !! link }
+							onChange={ ( value ) =>
+								setAttributes( { link: value } )
+							}
+						/>
+					) }
 					<SelectControl
 						label={ __( 'Value Type', 'query-filter' ) }
 						value={ valueType }
-						options={ VALUE_TYPE_OPTIONS }
-						disabled={
-							( filterType === 'sort' || filterType === 'page' ) &&
-							valueType === 'description'
-						}
+						options={ valueTypeOptions }
+						disabled={ filterType === 'page' }
 						onChange={ ( nextValue ) =>
 							setAttributes( { valueType: nextValue } )
 						}
@@ -87,13 +113,13 @@ export default function Edit( { attributes, setAttributes } ) {
 						label={ __( 'Prefix Text', 'query-filter' ) }
 						value={ prefix }
 						onChange={ ( value ) => setAttributes( { prefix: value } ) }
-						placeholder={ __( 'e.g. Showing results for ', 'query-filter' ) }
+					placeholder=""
 					/>
 					<TextControl
 						label={ __( 'Suffix Text', 'query-filter' ) }
 						value={ suffix }
 						onChange={ ( value ) => setAttributes( { suffix: value } ) }
-						placeholder={ __( 'e.g. only', 'query-filter' ) }
+					placeholder=""
 					/>
 				</PanelBody>
 			</InspectorControls>

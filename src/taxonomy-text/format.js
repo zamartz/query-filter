@@ -25,6 +25,7 @@ const DEFAULT_SETTINGS = {
 	valueType: 'title',
 	prefix: '',
 	suffix: '',
+	link: false,
 	showAfterFirstPage: true,
 };
 
@@ -33,6 +34,10 @@ const FILTER_OPTIONS = [
 	{ label: __( 'Category', 'query-filter' ), value: 'category' },
 	{ label: __( 'Sort', 'query-filter' ), value: 'sort' },
 	{ label: __( 'Page Number', 'query-filter' ), value: 'page' },
+	{
+		label: __( 'Yoast Primary Category', 'query-filter' ),
+		value: 'yoast_primary_category',
+	},
 ];
 
 const VALUE_TYPE_OPTIONS = [
@@ -73,6 +78,7 @@ const parseSettings = ( attributeValue ) => {
 			valueType: parsed.valueType || DEFAULT_SETTINGS.valueType,
 			prefix: parsed.prefix || '',
 			suffix: parsed.suffix || '',
+			link: parsed.link ?? DEFAULT_SETTINGS.link,
 			showAfterFirstPage:
 				parsed.showAfterFirstPage ?? DEFAULT_SETTINGS.showAfterFirstPage,
 		};
@@ -99,8 +105,10 @@ const FormatEdit = ( {
 	}, [ currentSettings ] );
 
 	useEffect( () => {
-		if (
-			[ 'sort', 'page' ].includes( settings.filterType ) &&
+		if ( settings.filterType === 'page' && settings.valueType !== 'page' ) {
+			setSettings( ( prev ) => ( { ...prev, valueType: 'page' } ) );
+		} else if (
+			settings.filterType === 'sort' &&
 			settings.valueType === 'description'
 		) {
 			setSettings( ( prev ) => ( { ...prev, valueType: 'title' } ) );
@@ -138,12 +146,18 @@ const FormatEdit = ( {
 			valueType:
 				filterType === 'page'
 					? 'page'
-					: [ 'sort', 'page' ].includes( filterType ) &&
-					  prev.valueType === 'description'
+					: filterType === 'sort' && prev.valueType === 'description'
 					? 'title'
 					: prev.valueType,
 		} ) );
 	};
+
+	const valueTypeOptions =
+		settings.filterType === 'page'
+			? VALUE_TYPE_OPTIONS.filter( ( option ) => option.value === 'page' )
+			: settings.filterType === 'sort'
+			? VALUE_TYPE_OPTIONS.filter( ( option ) => option.value === 'title' )
+			: VALUE_TYPE_OPTIONS;
 
 	return (
 		<>
@@ -167,12 +181,8 @@ const FormatEdit = ( {
 					<SelectControl
 						label={ __( 'Value Type', 'query-filter' ) }
 						value={ settings.valueType }
-						options={ VALUE_TYPE_OPTIONS }
-						disabled={
-							( settings.filterType === 'sort' ||
-								settings.filterType === 'page' ) &&
-							settings.valueType === 'description'
-						}
+						options={ valueTypeOptions }
+						disabled={ settings.filterType === 'page' }
 						onChange={ ( valueType ) =>
 							setSettings( ( prev ) => ( {
 								...prev,
@@ -194,6 +204,23 @@ const FormatEdit = ( {
 							setSettings( ( prev ) => ( { ...prev, suffix } ) )
 						}
 					/>
+					{ [ 'tag', 'category', 'yoast_primary_category' ].includes(
+						settings.filterType
+					) && (
+						<ToggleControl
+							label={ __(
+								'Link to term archive',
+								'query-filter'
+							) }
+							checked={ !! settings.link }
+							onChange={ ( next ) =>
+								setSettings( ( prev ) => ( {
+									...prev,
+									link: next,
+								} ) )
+							}
+						/>
+					) }
 					{ settings.filterType === 'page' && (
 						<ToggleControl
 							label={ __( 'Only show after page 1', 'query-filter' ) }

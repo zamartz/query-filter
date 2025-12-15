@@ -17,6 +17,10 @@ if ( is_null( $result ) ) {
 	return '';
 }
 
+$link_url = ( ! empty( $attributes['link'] ) && ! empty( $result['url'] ) )
+	? $result['url']
+	: '';
+
 $wrapper_attributes = get_block_wrapper_attributes(
 	[
 		'class' => sprintf(
@@ -28,6 +32,12 @@ $wrapper_attributes = get_block_wrapper_attributes(
 
 ?>
 <span <?php echo $wrapper_attributes; ?>>
-	<?php echo esc_html( $result['text'] ); ?>
+	<?php if ( $link_url ) : ?>
+		<a href="<?php echo esc_url( $link_url ); ?>">
+			<?php echo esc_html( $result['text'] ); ?>
+		</a>
+	<?php else : ?>
+		<?php echo esc_html( $result['text'] ); ?>
+	<?php endif; ?>
 </span>
 

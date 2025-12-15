@@ -542,12 +542,12 @@ function maybe_redirect_taxonomy_query_page() : void {
  *
  * @param array<string, mixed> $attributes Attributes.
  * @param array<string, mixed> $context    Block context.
- * @return array{ text: string, filter_type: string }|null
+ * @return array{ text: string, filter_type: string, url: string }|null
  */
 function get_taxonomy_text_result( array $attributes, array $context = [] ) : ?array {
-	$allowed_filters = [ 'tag', 'category', 'sort' ];
-	$filter_type = $attributes['filterType'] ?? 'tag';
-	$value_type = $attributes['valueType'] ?? 'title';
+	$allowed_filters = [ 'tag', 'category', 'sort', 'yoast_primary_category' ];
+	$filter_type     = $attributes['filterType'] ?? 'tag';
+	$value_type      = $attributes['valueType'] ?? 'title';
 
 	if ( ! in_array( $filter_type, $allowed_filters, true ) ) {
 		$filter_type = 'tag';
@@ -557,8 +557,8 @@ function get_taxonomy_text_result( array $attributes, array $context = [] ) : ?a
 		$value_type = 'title';
 	}
 
-	$prefix = (string) ( $attributes['prefix'] ?? '' );
-	$suffix = (string) ( $attributes['suffix'] ?? '' );
+	$prefix        = (string) ( $attributes['prefix'] ?? '' );
+	$suffix        = (string) ( $attributes['suffix'] ?? '' );
 	$query_context = $context['query'] ?? [];
 	$inherits_main = empty( $context ) || ! empty( $query_context['inherit'] );
 	$target_query_id = $inherits_main ? 'main' : (string) ( $context['queryId'] ?? 0 );
@@ -570,7 +570,7 @@ function get_taxonomy_text_result( array $attributes, array $context = [] ) : ?a
 		)
 	);
 
-	$legacy_prefix = 'main' === $target_query_id ? 'query-' : "query-{$target_query_id}-";
+	$legacy_prefix     = 'main' === $target_query_id ? 'query-' : "query-{$target_query_id}-";
 	$use_legacy_params = false;
 
 	if ( 'main' !== $target_query_id && empty( $requested_query_id ) ) {
@@ -593,16 +593,60 @@ function get_taxonomy_text_result( array $attributes, array $context = [] ) : ?a
 	}
 
 	$param_suffix_map = [
-		'tag' => 'post_tag',
+		'tag'      => 'post_tag',
 		'category' => 'category',
-		'sort' => 'post_orderby',
+		'sort'     => 'post_orderby',
 	];
 
 	$show_after_first_page = isset( $attributes['showAfterFirstPage'] )
 		? (bool) $attributes['showAfterFirstPage']
 		: true;
 
-	if ( 'page' === $value_type ) {
+	$display_value = '';
+	$raw_value     = '';
+	$url           = '';
+
+	// Special-case: Yoast primary category, if available.
+	if ( 'yoast_primary_category' === $filter_type ) {
+		if ( ! class_exists( '\WPSEO_Primary_Term' ) ) {
+			return null;
+		}
+
+		$post_id = $context['postId'] ?? get_the_ID();
+
+		if ( ! $post_id ) {
+			return null;
+		}
+
+		$primary = new \WPSEO_Primary_Term( 'category', $post_id );
+		$term_id = $primary->get_primary_term();
+
+		if ( ! $term_id || is_wp_error( $term_id ) ) {
+			return null;
+		}
+
+		$term = get_term( (int) $term_id, 'category' );
+
+		if ( ! $term || is_wp_error( $term ) ) {
+			return null;
+		}
+
+		$title       = $term->name;
+		$description = trim( wp_strip_all_tags( $term->description ?? '' ) );
+
+		if ( 'description' === $value_type && '' !== $description ) {
+			$display_value = $description;
+		} else {
+			$display_value = $title;
+		}
+
+		$term_link = get_term_link( $term );
+
+		if ( ! is_wp_error( $term_link ) ) {
+			$url = (string) $term_link;
+		}
+	} elseif ( 'page' === $value_type ) {
+		// Page mode – just derive from pagination.
 		$paged = 1;
 
 		// Prefer explicit query-* page params for the targeted query.
@@ -631,34 +675,14 @@ function get_taxonomy_text_result( array $attributes, array $context = [] ) : ?a
 		}
 
 		$display_value = (string) max( 1, $paged );
-	} elseif ( 'sort' === $filter_type ) {
-		$sort_labels = [
-			'date:DESC' => __( 'Newest to Oldest', 'query-filter' ),
-			'date:ASC' => __( 'Oldest to Newest', 'query-filter' ),
-			'title:ASC' => __( 'A → Z', 'query-filter' ),
-			'title:DESC' => __( 'Z → A', 'query-filter' ),
-			'comment_count:DESC' => __( 'Most Commented', 'query-filter' ),
-			'menu_order:ASC' => __( 'Menu Order', 'query-filter' ),
-		];
-
-		$parts = explode( ':', $raw_value );
-		$orderby = sanitize_key( $parts[0] ?? '' );
-		$order = strtoupper( sanitize_text_field( $parts[1] ?? '' ) );
-		$normalized = $orderby . ':' . $order;
-
-		if ( isset( $sort_labels[ $normalized ] ) ) {
-			$display_value = $sort_labels[ $normalized ];
-		}
-		if ( 'description' === $value_type ) {
-			$value_type = 'title';
-		}
 	} else {
-		$param_candidates = array_unique( [
-			'query-' . $param_suffix_map[ $filter_type ],
-			$legacy_prefix . $param_suffix_map[ $filter_type ],
-		] );
-
-		$raw_value = '';
+		// For tag, category and sort, resolve the raw query param value first.
+		$param_candidates = array_unique(
+			[
+				'query-' . $param_suffix_map[ $filter_type ],
+				$legacy_prefix . $param_suffix_map[ $filter_type ],
+			]
+		);
 
 		foreach ( $param_candidates as $param_name ) {
 			if ( isset( $_GET[ $param_name ] ) && '' !== $_GET[ $param_name ] ) {
@@ -671,65 +695,92 @@ function get_taxonomy_text_result( array $attributes, array $context = [] ) : ?a
 			return null;
 		}
 
-		$taxonomy = 'tag' === $filter_type ? 'post_tag' : 'category';
-		$raw_slugs = array_filter(
-			array_map(
-				'trim',
-				explode( ',', $raw_value )
-			)
-		);
-		$slugs = array_values(
-			array_filter(
-				array_map(
-					static function ( $slug ) {
-						$sanitized = sanitize_title( $slug );
-
-						return '' === $sanitized ? null : $sanitized;
-					},
-					$raw_slugs
-				)
-			)
-		);
-
-		if ( empty( $slugs ) ) {
-			return null;
-		}
-
-		$terms = get_terms(
-			[
-				'taxonomy' => $taxonomy,
-				'slug' => $slugs,
-				'hide_empty' => false,
-			]
-		);
-
-		if ( is_wp_error( $terms ) || empty( $terms ) ) {
-			return null;
-		}
-
-		$term_lookup = [];
-
-		foreach ( $terms as $term ) {
-			$term_lookup[ $term->slug ] = [
-				'title' => $term->name,
-				'description' => trim( wp_strip_all_tags( $term->description ?? '' ) ),
+		if ( 'sort' === $filter_type ) {
+			$sort_labels = [
+				'date:DESC'          => __( 'Newest to Oldest', 'query-filter' ),
+				'date:ASC'           => __( 'Oldest to Newest', 'query-filter' ),
+				'title:ASC'          => __( 'A → Z', 'query-filter' ),
+				'title:DESC'         => __( 'Z → A', 'query-filter' ),
+				'comment_count:DESC' => __( 'Most Commented', 'query-filter' ),
+				'menu_order:ASC'     => __( 'Menu Order', 'query-filter' ),
 			];
-		}
 
-		$ordered_values = [];
-		$value_key = 'description' === $value_type ? 'description' : 'title';
+			$parts      = explode( ':', $raw_value );
+			$orderby    = sanitize_key( $parts[0] ?? '' );
+			$order      = strtoupper( sanitize_text_field( $parts[1] ?? '' ) );
+			$normalized = $orderby . ':' . $order;
 
-		foreach ( $slugs as $slug ) {
-			if ( isset( $term_lookup[ $slug ][ $value_key ] ) && '' !== $term_lookup[ $slug ][ $value_key ] ) {
-				$ordered_values[] = $term_lookup[ $slug ][ $value_key ];
+			if ( isset( $sort_labels[ $normalized ] ) ) {
+				$display_value = $sort_labels[ $normalized ];
 			}
-		}
 
-		if ( empty( $ordered_values ) ) {
-			return null;
-		}
+			// Ensure we never try to look up a "description" label for sort.
+			if ( 'description' === $value_type ) {
+				$value_type = 'title';
+			}
+		} else {
+			$taxonomy = 'tag' === $filter_type ? 'post_tag' : 'category';
 
-		$display_value = implode( ', ', $ordered_values );
+			$raw_slugs = array_filter(
+				array_map(
+					'trim',
+					explode( ',', $raw_value )
+				)
+			);
+
+			$slugs = array_values(
+				array_filter(
+					array_map(
+						static function ( $slug ) {
+							$sanitized = sanitize_title( $slug );
+
+							return '' === $sanitized ? null : $sanitized;
+						},
+						$raw_slugs
+					)
+				)
+			);
+
+			if ( empty( $slugs ) ) {
+				return null;
+			}
+
+			$terms = get_terms(
+				[
+					'taxonomy'   => $taxonomy,
+					'slug'       => $slugs,
+					'hide_empty' => false,
+				]
+			);
+
+			if ( is_wp_error( $terms ) || empty( $terms ) ) {
+				return null;
+			}
+
+			$term_lookup = [];
+
+			foreach ( $terms as $term ) {
+				$term_lookup[ $term->slug ] = [
+					'title'       => $term->name,
+					'description' => trim( wp_strip_all_tags( $term->description ?? '' ) ),
+				];
+			}
+
+			$ordered_values = [];
+			$value_key      = 'description' === $value_type ? 'description' : 'title';
+
+			foreach ( $slugs as $slug ) {
+				if ( isset( $term_lookup[ $slug ][ $value_key ] ) && '' !== $term_lookup[ $slug ][ $value_key ] ) {
+					$ordered_values[] = $term_lookup[ $slug ][ $value_key ];
+				}
+			}
+
+			if ( empty( $ordered_values ) ) {
+				return null;
+			}
+
+			$display_value = implode( ', ', $ordered_values );
+		}
 	}
 
 	if ( '' === $display_value ) {
@@ -743,8 +794,9 @@ function get_taxonomy_text_result( array $attributes, array $context = [] ) : ?a
 	}
 
 	return [
-		'text' => $text,
+		'text'        => $text,
 		'filter_type' => $filter_type,
+		'url'         => $url,
 	];
 }
 
@@ -783,10 +835,24 @@ function replace_inline_taxonomy_text_spans( string $content, array $context = [
 				sanitize_html_class( $result['filter_type'] )
 			);
 
+			$link_url = ( ! empty( $attributes['link'] ) && ! empty( $result['url'] ) )
+				? $result['url']
+				: '';
+
+			$text_html = esc_html( $result['text'] );
+
+			if ( $link_url ) {
+				$text_html = sprintf(
+					'<a href="%s">%s</a>',
+					esc_url( $link_url ),
+					$text_html
+				);
+			}
+
 			return sprintf(
 				'<span class="%s">%s</span>',
 				esc_attr( $class ),
-				esc_html( $result['text'] )
+				$text_html
 			);
 		},
 		$content

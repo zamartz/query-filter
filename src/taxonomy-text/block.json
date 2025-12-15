@@ -33,13 +33,17 @@
 	"attributes": {
 		"filterType": {
 			"type": "string",
-			"enum": [ "tag", "category", "sort", "page" ],
+			"enum": [ "tag", "category", "sort", "page", "yoast_primary_category" ],
 			"default": "tag"
 		},
 		"valueType": {
 			"type": "string",
 			"enum": [ "title", "description", "page" ],
 			"default": "title"
+		},
+		"link": {
+			"type": "boolean",
+			"default": false
 		},
 		"showAfterFirstPage": {
 			"type": "boolean",

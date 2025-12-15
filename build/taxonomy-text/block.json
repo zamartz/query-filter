@@ -47,7 +47,8 @@
         "tag",
         "category",
         "sort",
-        "page"
+        "page",
+        "yoast_primary_category"
       ],
       "default": "tag"
     },
@@ -59,6 +60,10 @@
         "page"
       ],
       "default": "title"
+    },
+    "link": {
+      "type": "boolean",
+      "default": false
     },
     "showAfterFirstPage": {
       "type": "boolean",
