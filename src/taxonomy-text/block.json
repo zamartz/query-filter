@@ -33,7 +33,7 @@
 	"attributes": {
 		"filterType": {
 			"type": "string",
-			"enum": [ "tag", "category", "sort", "page", "yoast_primary_category" ],
+			"enum": [ "tag", "category", "sort", "page", "yoast_primary_category", "search" ],
 			"default": "tag"
 		},
 		"valueType": {

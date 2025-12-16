@@ -16,6 +16,7 @@ const FILTER_OPTIONS = [
 		label: __( 'Yoast Primary Category', 'query-filter' ),
 		value: 'yoast_primary_category',
 	},
+	{ label: __( 'Searched Term', 'query-filter' ), value: 'search' },
 ];
 
 const VALUE_TYPE_OPTIONS = [
@@ -41,6 +42,8 @@ export default function Edit( { attributes, setAttributes } ) {
 	const previewValue =
 		filterType === 'sort'
 			? __( 'Selected Sort', 'query-filter' )
+			: filterType === 'search'
+			? __( 'Searched Term', 'query-filter' )
 			: valueType === 'description'
 			? __( 'Selected Term Description', 'query-filter' )
 			: __( 'Selected Term', 'query-filter' );
@@ -51,7 +54,7 @@ export default function Edit( { attributes, setAttributes } ) {
 			valueType:
 				nextFilter === 'page'
 					? 'page'
-					: nextFilter === 'sort' && valueType === 'description'
+					: ( nextFilter === 'sort' || nextFilter === 'search' ) && valueType === 'description'
 					? 'title'
 					: valueType,
 		} );
@@ -60,7 +63,7 @@ export default function Edit( { attributes, setAttributes } ) {
 	const valueTypeOptions =
 		filterType === 'page'
 			? VALUE_TYPE_OPTIONS.filter( ( option ) => option.value === 'page' )
-			: filterType === 'sort'
+			: filterType === 'sort' || filterType === 'search'
 			? VALUE_TYPE_OPTIONS.filter( ( option ) => option.value === 'title' )
 			: VALUE_TYPE_OPTIONS;
 
@@ -88,15 +91,17 @@ export default function Edit( { attributes, setAttributes } ) {
 							}
 						/>
 					) }
-					<SelectControl
-						label={ __( 'Value Type', 'query-filter' ) }
-						value={ valueType }
-						options={ valueTypeOptions }
-						disabled={ filterType === 'page' }
-						onChange={ ( nextValue ) =>
-							setAttributes( { valueType: nextValue } )
-						}
-					/>
+					{ filterType !== 'search' && (
+						<SelectControl
+							label={ __( 'Value Type', 'query-filter' ) }
+							value={ valueType }
+							options={ valueTypeOptions }
+							disabled={ filterType === 'page' }
+							onChange={ ( nextValue ) =>
+								setAttributes( { valueType: nextValue } )
+							}
+						/>
+					) }
 					{ filterType === 'page' && (
 						<ToggleControl
 							label={ __(

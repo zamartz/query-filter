@@ -546,7 +546,7 @@ function maybe_redirect_taxonomy_query_page() : void {
  * @return array{ text: string, filter_type: string, url: string }|null
  */
 function get_taxonomy_text_result( array $attributes, array $context = [] ) : ?array {
-	$allowed_filters = [ 'tag', 'category', 'sort', 'yoast_primary_category' ];
+	$allowed_filters = [ 'tag', 'category', 'sort', 'yoast_primary_category', 'search' ];
 	$filter_type     = $attributes['filterType'] ?? 'tag';
 	$value_type      = $attributes['valueType'] ?? 'title';
 
@@ -646,6 +646,20 @@ function get_taxonomy_text_result( array $attributes, array $context = [] ) : ?a
 		if ( ! is_wp_error( $term_link ) ) {
 			$url = (string) $term_link;
 		}
+	} elseif ( 'search' === $filter_type ) {
+		// Search term mode – extract from URL parameter 's'.
+		$search_term = get_query_var( 's', '' );
+
+		if ( empty( $search_term ) && isset( $_GET['s'] ) ) {
+			$search_term = sanitize_text_field( wp_unslash( $_GET['s'] ) );
+		}
+
+		if ( empty( $search_term ) ) {
+			return null;
+		}
+
+		// Decode URL-encoded search terms (e.g., "garden+tools" -> "garden tools").
+		$display_value = urldecode( $search_term );
 	} elseif ( 'page' === $value_type ) {
 		// Page mode – just derive from pagination.
 		$paged = 1;

@@ -38,6 +38,7 @@ const FILTER_OPTIONS = [
 		label: __( 'Yoast Primary Category', 'query-filter' ),
 		value: 'yoast_primary_category',
 	},
+	{ label: __( 'Searched Term', 'query-filter' ), value: 'search' },
 ];
 
 const VALUE_TYPE_OPTIONS = [
@@ -56,7 +57,7 @@ const getPlaceholderText = ( settings ) => {
 	];
 
 	const valueLabel =
-		settings.filterType === 'sort' && settings.valueType !== 'page'
+		( settings.filterType === 'sort' || settings.filterType === 'search' ) && settings.valueType !== 'page'
 			? __( 'title', 'query-filter' )
 			: getOptionLabel( VALUE_TYPE_OPTIONS, settings.valueType );
 
@@ -108,7 +109,7 @@ const FormatEdit = ( {
 		if ( settings.filterType === 'page' && settings.valueType !== 'page' ) {
 			setSettings( ( prev ) => ( { ...prev, valueType: 'page' } ) );
 		} else if (
-			settings.filterType === 'sort' &&
+			( settings.filterType === 'sort' || settings.filterType === 'search' ) &&
 			settings.valueType === 'description'
 		) {
 			setSettings( ( prev ) => ( { ...prev, valueType: 'title' } ) );
@@ -146,7 +147,7 @@ const FormatEdit = ( {
 			valueType:
 				filterType === 'page'
 					? 'page'
-					: filterType === 'sort' && prev.valueType === 'description'
+					: ( filterType === 'sort' || filterType === 'search' ) && prev.valueType === 'description'
 					? 'title'
 					: prev.valueType,
 		} ) );
@@ -155,7 +156,7 @@ const FormatEdit = ( {
 	const valueTypeOptions =
 		settings.filterType === 'page'
 			? VALUE_TYPE_OPTIONS.filter( ( option ) => option.value === 'page' )
-			: settings.filterType === 'sort'
+			: settings.filterType === 'sort' || settings.filterType === 'search'
 			? VALUE_TYPE_OPTIONS.filter( ( option ) => option.value === 'title' )
 			: VALUE_TYPE_OPTIONS;
 
@@ -178,18 +179,20 @@ const FormatEdit = ( {
 						options={ FILTER_OPTIONS }
 						onChange={ handleFilterChange }
 					/>
-					<SelectControl
-						label={ __( 'Value Type', 'query-filter' ) }
-						value={ settings.valueType }
-						options={ valueTypeOptions }
-						disabled={ settings.filterType === 'page' }
-						onChange={ ( valueType ) =>
-							setSettings( ( prev ) => ( {
-								...prev,
-								valueType,
-							} ) )
-						}
-					/>
+					{ settings.filterType !== 'search' && (
+						<SelectControl
+							label={ __( 'Value Type', 'query-filter' ) }
+							value={ settings.valueType }
+							options={ valueTypeOptions }
+							disabled={ settings.filterType === 'page' }
+							onChange={ ( valueType ) =>
+								setSettings( ( prev ) => ( {
+									...prev,
+									valueType,
+								} ) )
+							}
+						/>
+					) }
 					<TextControl
 						label={ __( 'Prefix Text', 'query-filter' ) }
 						value={ settings.prefix }
